@@ -3,6 +3,22 @@ Kivy is the one UI toolkit that packages the same code for Windows, macOS, Linux
 
 import sys
 
+# Keep Windows mouse coordinates in the same per-monitor pixel space as the
+# rendered Kivy widgets. This must happen before Kivy creates its SDL window.
+if sys.platform == "win32":
+    import ctypes
+
+    try:
+        ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
+    except (AttributeError, OSError):
+        try:
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)
+        except (AttributeError, OSError):
+            try:
+                ctypes.windll.user32.SetProcessDPIAware()
+            except (AttributeError, OSError):
+                pass
+
 from kivy.config import Config
 
 # The AI searches on a worker thread. Shorter GIL slices keep the board drawing
@@ -131,10 +147,11 @@ class ChessApp(App):
         # Board with rank numbers on the left and file letters underneath.
         self.cells = [[None] * 8 for _ in range(8)]
         grid = GridLayout(cols=8)
+        self.board_grid = grid
         for r in range(8):
             for c in range(8):
                 cell = Cell()
-                cell.bind(on_release=lambda _w, r=r, c=c: self.on_cell(r, c))
+                cell.bind(on_release=lambda widget: self.on_cell_widget(widget))
                 self.cells[r][c] = cell
                 grid.add_widget(cell)
         self.rank_labels = [ui_label(font_size=sp(13)) for _ in range(8)]
@@ -250,6 +267,22 @@ class ChessApp(App):
                 cell.set_overlay(marker, cursor)
 
     # ------------------------------------------------------------ input
+    def on_cell_widget(self, cell):
+        """Route a square click from its live screen position, not build order.
+
+        Kivy layouts can reorder children and sizes vary with DPI/window shape.
+        Deriving the board cell from the widget's actual position keeps the
+        chess coordinate aligned with the square the player sees and taps.
+        """
+        grid = self.board_grid
+        if cell.width <= 0 or cell.height <= 0:
+            return
+        col = int((cell.center_x - grid.x) / cell.width)
+        row = int((grid.top - cell.center_y) / cell.height)
+        row = min(7, max(0, row))
+        col = min(7, max(0, col))
+        self.on_cell(row, col)
+
     def on_cell(self, row, col):
         options = self.game.click(self.disp_to_sq(row, col))
         if options:

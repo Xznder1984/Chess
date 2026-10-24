@@ -61,6 +61,8 @@ jobs:
           New-Item -ItemType Directory -Force assets | Out-Null
           Copy-Item $engine.FullName assets/stockfish.exe
           Invoke-WebRequest https://raw.githubusercontent.com/official-stockfish/Stockfish/sf_19/Copying.txt -OutFile assets/Stockfish-Copying.txt
+          $uci = "uci`nquit`n" | & assets/stockfish.exe
+          if ($LASTEXITCODE -ne 0 -or ($uci -join "`n") -notmatch 'uciok') { throw 'Bundled Stockfish did not start correctly.' }
 
       - name: Download bundled Stockfish (macOS/Linux)
         if: runner.os != 'Windows'
@@ -74,6 +76,8 @@ jobs:
           cp "$engine" assets/stockfish
           chmod 755 assets/stockfish
           curl -fL https://raw.githubusercontent.com/official-stockfish/Stockfish/sf_19/Copying.txt -o assets/Stockfish-Copying.txt
+          uci_output="$(printf 'uci\nquit\n' | assets/stockfish)"
+          printf '%s\n' "$uci_output" | grep -q 'uciok'
 
       - name: Build Windows installer
         if: runner.os == 'Windows'
@@ -81,7 +85,7 @@ jobs:
         run: |
           $env:KIVY_WINDOW = 'none'
           $env:KIVY_LOG_MODE = 'MIXED'
-          python -m PyInstaller --noconfirm --windowed --name Chess --add-binary "assets/stockfish.exe;." main.py
+          python -m PyInstaller --noconfirm --windowed --name Chess --manifest windows.manifest --add-binary "assets/stockfish.exe;." main.py
           Copy-Item THIRD_PARTY_NOTICES.md dist/Chess/
           Copy-Item assets/Stockfish-Copying.txt dist/Chess/
           choco install innosetup -y --no-progress
@@ -155,10 +159,12 @@ jobs:
           python3 -m pip install --user buildozer Cython==0.29.36
       - name: Build APK
         run: yes | ~/.local/bin/buildozer android debug
+      - name: Give the Android APK a clear release filename
+        run: cp bin/*.apk bin/Chess-Android-arm64.apk
       - uses: actions/upload-artifact@v4
         with:
           name: chess-Android
-          path: bin/*.apk
+          path: bin/Chess-Android-arm64.apk
           if-no-files-found: error
 
   publish:

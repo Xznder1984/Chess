@@ -43,16 +43,18 @@ GPLv3; packages include its license and [corresponding source](https://github.co
 
 ## Build
 
-Tagged releases build Windows setup, macOS disk images for Intel and Apple Silicon, Linux `.deb`
-and portable archive, plus a 64-bit ARM Android APK. GitHub Actions builds each desktop version on
-its matching runner; Android is built on Linux. These release packages have not been built locally
-on every platform.
+Tagged releases provide separate desktop installers and an Android APK: Windows setup, macOS disk
+images for Intel and Apple Silicon, Linux `.deb` and portable archive, and `Chess-Android-arm64.apk`.
+The desktop installers install the game together with its matching Stockfish engine inside the app
+folder. Android is built and uploaded as a separate APK job. GitHub Actions builds each desktop
+version on its matching runner; Android is built on Linux. These release packages have not been
+built locally on every platform.
 Create and push a version tag such as `v1.0.0` to run the release workflow. You can also run the
 workflow manually to check build artifacts without publishing a release.
 
 For local builds, build on the target platform. PyInstaller and Buildozer do not cross-compile.
 
-- **Windows:** `pip install pyinstaller` then `pyinstaller --windowed --name Chess main.py`
+- **Windows:** `pip install pyinstaller` then `pyinstaller --windowed --manifest windows.manifest --name Chess main.py`
 - **macOS:** the same command on a Mac. It builds for that Mac's chip (Intel or Apple Silicon).
   Unsigned apps trigger a Gatekeeper warning until you sign and notarize them.
 - **Linux:** the same command.
