@@ -79,7 +79,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          python -m PyInstaller --noconfirm --windowed --collect-all kivy --name Chess --add-binary "assets/stockfish.exe;." main.py
+          python -m PyInstaller --noconfirm --windowed --name Chess --add-binary "assets/stockfish.exe;." main.py
           Copy-Item THIRD_PARTY_NOTICES.md dist/Chess/
           Copy-Item assets/Stockfish-Copying.txt dist/Chess/
           choco install innosetup -y --no-progress
@@ -89,7 +89,7 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          python -m PyInstaller --noconfirm --windowed --collect-all kivy --name Chess --osx-bundle-identifier org.pychess.chess --add-binary "assets/stockfish:." main.py
+          python -m PyInstaller --noconfirm --windowed --name Chess --osx-bundle-identifier org.pychess.chess --add-binary "assets/stockfish:." main.py
           mkdir -p dist/Chess.app/Contents/Resources
           cp THIRD_PARTY_NOTICES.md dist/Chess.app/Contents/Resources/
           cp assets/Stockfish-Copying.txt dist/Chess.app/Contents/Resources/
@@ -99,7 +99,7 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          python -m PyInstaller --noconfirm --windowed --collect-all kivy --name Chess --add-binary "assets/stockfish:." main.py
+          python -m PyInstaller --noconfirm --windowed --name Chess --add-binary "assets/stockfish:." main.py
           cp THIRD_PARTY_NOTICES.md dist/Chess/
           cp assets/Stockfish-Copying.txt dist/Chess/
           tar -C dist -czf dist/Chess-linux-x86_64.tar.gz Chess

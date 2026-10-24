@@ -4,7 +4,6 @@ package.name = chesspy
 # Change the domain to one you own before publishing.
 package.domain = org.pychess
 source.dir = .
-source.include_exts = py
 source.include_exts = py,kv,atlas,png,jpg,ttf,stockfish,bin,txt
 source.exclude_patterns = test_engine.py,contrast_check.py,.github/*,stockfish-extracted/*
 version = 1.0
