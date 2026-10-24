@@ -43,9 +43,10 @@ GPLv3; packages include its license and [corresponding source](https://github.co
 
 ## Build
 
-Tagged releases build Windows setup, macOS disk image, Linux `.deb` and portable archive, plus
-Android APKs for arm64 and armv7. GitHub Actions builds each desktop version on its matching runner;
-Android is built on Linux. These release packages have not been built locally on every platform.
+Tagged releases build Windows setup, macOS disk images for Intel and Apple Silicon, Linux `.deb`
+and portable archive, plus a 64-bit ARM Android APK. GitHub Actions builds each desktop version on
+its matching runner; Android is built on Linux. These release packages have not been built locally
+on every platform.
 Create and push a version tag such as `v1.0.0` to run the release workflow. You can also run the
 workflow manually to check build artifacts without publishing a release.
 

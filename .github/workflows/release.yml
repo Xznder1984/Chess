@@ -79,6 +79,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $env:KIVY_WINDOW = 'none'
+          $env:KIVY_LOG_MODE = 'MIXED'
           python -m PyInstaller --noconfirm --windowed --name Chess --add-binary "assets/stockfish.exe;." main.py
           Copy-Item THIRD_PARTY_NOTICES.md dist/Chess/
           Copy-Item assets/Stockfish-Copying.txt dist/Chess/
@@ -124,7 +126,7 @@ jobs:
           if-no-files-found: error
 
   android:
-    name: Android APK (arm64)
+    name: Android APK (64-bit ARM)
     runs-on: ubuntu-22.04
     needs: tests
     steps:
@@ -139,13 +141,6 @@ jobs:
           test -n "$engine"
           cp "$engine" stockfish
           chmod 755 stockfish
-          curl -fL https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-android-armv7-neon.tar.gz -o stockfish-armv7.tar.gz
-          mkdir -p stockfish-armv7-extracted
-          tar -xf stockfish-armv7.tar.gz -C stockfish-armv7-extracted
-          engine="$(find stockfish-armv7-extracted -type f -name 'stockfish*' -perm -u+x | head -n 1)"
-          test -n "$engine"
-          cp "$engine" stockfish_armv7.bin
-          chmod 755 stockfish_armv7.bin
           mv stockfish stockfish_arm64.bin
           curl -fL https://raw.githubusercontent.com/official-stockfish/Stockfish/sf_19/Copying.txt -o Stockfish-Copying.txt
       - uses: actions/setup-java@v4
