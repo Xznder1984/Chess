@@ -99,7 +99,9 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          python -m PyInstaller --noconfirm --windowed --name Chess --add-binary "assets/stockfish:." main.py
+          sudo apt-get update
+          sudo apt-get install -y xvfb libmtdev1
+          xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 python -m PyInstaller --noconfirm --windowed --name Chess --add-binary "assets/stockfish:." main.py
           cp THIRD_PARTY_NOTICES.md dist/Chess/
           cp assets/Stockfish-Copying.txt dist/Chess/
           tar -C dist -czf dist/Chess-linux-x86_64.tar.gz Chess
@@ -157,7 +159,7 @@ jobs:
           python3 -m pip install --user --upgrade pip setuptools virtualenv
           python3 -m pip install --user buildozer Cython==0.29.36
       - name: Build APK
-        run: ~/.local/bin/buildozer android debug
+        run: yes | ~/.local/bin/buildozer android debug
       - uses: actions/upload-artifact@v4
         with:
           name: chess-Android
