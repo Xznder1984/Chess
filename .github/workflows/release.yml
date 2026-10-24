@@ -1,0 +1,181 @@
+name: Build installers and release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  tests:
+    name: Engine and contrast checks
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python3 test_engine.py
+      - run: python3 contrast_check.py
+
+  desktop:
+    name: Desktop (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: tests
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: windows-x64
+            engine: https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-windows-x86-64-universal.zip
+          - os: macos-15
+            artifact: macos-arm64
+            engine: https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-macos-universal.tar.gz
+          - os: macos-15-intel
+            artifact: macos-x64
+            engine: https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-macos-universal.tar.gz
+          - os: ubuntu-22.04
+            artifact: linux-x64
+            engine: https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-linux-x86-64-universal.tar.gz
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build dependencies
+        run: python -m pip install -r requirements.txt pyinstaller
+
+      - name: Download bundled Stockfish (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest '${{ matrix.engine }}' -OutFile stockfish.zip
+          Expand-Archive stockfish.zip -DestinationPath stockfish-extracted
+          $engine = Get-ChildItem stockfish-extracted -Recurse -File | Where-Object { $_.Name -match '^stockfish.*\.exe$' } | Select-Object -First 1
+          if (-not $engine) { throw 'Stockfish executable was not found in the official archive.' }
+          New-Item -ItemType Directory -Force assets | Out-Null
+          Copy-Item $engine.FullName assets/stockfish.exe
+          Invoke-WebRequest https://raw.githubusercontent.com/official-stockfish/Stockfish/sf_19/Copying.txt -OutFile assets/Stockfish-Copying.txt
+
+      - name: Download bundled Stockfish (macOS/Linux)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p stockfish-extracted assets
+          curl -fL '${{ matrix.engine }}' -o stockfish-archive
+          tar -xf stockfish-archive -C stockfish-extracted
+          engine="$(find stockfish-extracted -type f -name 'stockfish*' -perm -u+x | head -n 1)"
+          test -n "$engine"
+          cp "$engine" assets/stockfish
+          chmod 755 assets/stockfish
+          curl -fL https://raw.githubusercontent.com/official-stockfish/Stockfish/sf_19/Copying.txt -o assets/Stockfish-Copying.txt
+
+      - name: Build Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --windowed --collect-all kivy --name Chess --add-binary "assets/stockfish.exe;." main.py
+          Copy-Item THIRD_PARTY_NOTICES.md dist/Chess/
+          Copy-Item assets/Stockfish-Copying.txt dist/Chess/
+          choco install innosetup -y --no-progress
+          iscc installer.iss
+
+      - name: Build macOS disk image
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          python -m PyInstaller --noconfirm --windowed --collect-all kivy --name Chess --osx-bundle-identifier org.pychess.chess --add-binary "assets/stockfish:." main.py
+          mkdir -p dist/Chess.app/Contents/Resources
+          cp THIRD_PARTY_NOTICES.md dist/Chess.app/Contents/Resources/
+          cp assets/Stockfish-Copying.txt dist/Chess.app/Contents/Resources/
+          hdiutil create -volname Chess -srcfolder dist/Chess.app -ov -format UDZO dist/Chess-macos.dmg
+
+      - name: Build Linux bundle
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          python -m PyInstaller --noconfirm --windowed --collect-all kivy --name Chess --add-binary "assets/stockfish:." main.py
+          cp THIRD_PARTY_NOTICES.md dist/Chess/
+          cp assets/Stockfish-Copying.txt dist/Chess/
+          tar -C dist -czf dist/Chess-linux-x86_64.tar.gz Chess
+          mkdir -p package/DEBIAN package/opt/chess package/usr/bin package/usr/share/applications
+          cp -R dist/Chess/. package/opt/chess/
+          printf '#!/bin/sh\nexec /opt/chess/Chess "$@"\n' > package/usr/bin/chess
+          chmod 755 package/usr/bin/chess
+          printf '[Desktop Entry]\nType=Application\nName=Chess\nExec=chess\nIcon=chess\nCategories=Game;BoardGame;\n' > package/usr/share/applications/chess.desktop
+          printf 'Package: chess\nVersion: 1.0.0\nArchitecture: amd64\nMaintainer: Chess project\nDescription: Offline chess game with optional Stockfish\n' > package/DEBIAN/control
+          dpkg-deb --build --root-owner-group package dist/Chess-linux-amd64.deb
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chess-${{ matrix.artifact }}
+          path: |
+            release/*
+            dist/Chess-macos.dmg
+            dist/Chess-linux-x86_64.tar.gz
+            dist/Chess-linux-amd64.deb
+          if-no-files-found: error
+
+  android:
+    name: Android APK (arm64)
+    runs-on: ubuntu-22.04
+    needs: tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download bundled Stockfish for Android
+        shell: bash
+        run: |
+          mkdir -p stockfish-extracted
+          curl -fL https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-android-arm64-universal.tar.gz -o stockfish.tar.gz
+          tar -xf stockfish.tar.gz -C stockfish-extracted
+          engine="$(find stockfish-extracted -type f -name 'stockfish*' -perm -u+x | head -n 1)"
+          test -n "$engine"
+          cp "$engine" stockfish
+          chmod 755 stockfish
+          curl -fL https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-android-armv7-neon.tar.gz -o stockfish-armv7.tar.gz
+          mkdir -p stockfish-armv7-extracted
+          tar -xf stockfish-armv7.tar.gz -C stockfish-armv7-extracted
+          engine="$(find stockfish-armv7-extracted -type f -name 'stockfish*' -perm -u+x | head -n 1)"
+          test -n "$engine"
+          cp "$engine" stockfish_armv7.bin
+          chmod 755 stockfish_armv7.bin
+          mv stockfish stockfish_arm64.bin
+          curl -fL https://raw.githubusercontent.com/official-stockfish/Stockfish/sf_19/Copying.txt -o Stockfish-Copying.txt
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Install Android build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential ccache git libffi-dev libssl-dev zlib1g-dev zip unzip
+          python3 -m pip install --user --upgrade pip setuptools virtualenv
+          python3 -m pip install --user buildozer Cython==0.29.36
+      - name: Build APK
+        run: ~/.local/bin/buildozer android debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chess-Android
+          path: bin/*.apk
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [desktop, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Create release with installers
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release-assets/**
