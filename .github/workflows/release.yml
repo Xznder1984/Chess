@@ -95,7 +95,7 @@ jobs:
           mkdir -p dist/Chess.app/Contents/Resources
           cp THIRD_PARTY_NOTICES.md dist/Chess.app/Contents/Resources/
           cp assets/Stockfish-Copying.txt dist/Chess.app/Contents/Resources/
-          hdiutil create -volname Chess -srcfolder dist/Chess.app -ov -format UDZO dist/Chess-macos.dmg
+          hdiutil create -volname Chess -srcfolder dist/Chess.app -ov -format UDZO "dist/Chess-${{ matrix.artifact }}.dmg"
 
       - name: Build Linux bundle
         if: runner.os == 'Linux'
@@ -120,7 +120,7 @@ jobs:
           name: chess-${{ matrix.artifact }}
           path: |
             release/*
-            dist/Chess-macos.dmg
+            dist/Chess-macos-*.dmg
             dist/Chess-linux-x86_64.tar.gz
             dist/Chess-linux-amd64.deb
           if-no-files-found: error
